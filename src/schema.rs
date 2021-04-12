@@ -441,6 +441,7 @@ where
         };
 
         let env = QueryEnvInner {
+            errors: Default::default(),
             extensions,
             variables: request.variables,
             operation,

@@ -23,18 +23,14 @@ pub trait ContainerType: OutputType {
 
     /// Resolves a field value and outputs it as a json value `async_graphql::Value`.
     ///
-    /// If the field was not found returns None.
-    async fn resolve_field(&self, ctx: &Context<'_>) -> ServerResult<Option<Value>>;
+    /// If the field was not found returns [Value::Null].
+    async fn resolve_field(&self, ctx: &Context<'_>) -> Value;
 
     /// Collect all the fields of the container that are queried in the selection set.
     ///
     /// Objects do not have to override this, but interfaces and unions must call it on their
     /// internal type.
-    fn collect_all_fields<'a>(
-        &'a self,
-        ctx: &ContextSelectionSet<'a>,
-        fields: &mut Fields<'a>,
-    ) -> ServerResult<()>
+    fn collect_all_fields<'a>(&'a self, ctx: &ContextSelectionSet<'a>, fields: &mut Fields<'a>)
     where
         Self: Send + Sync,
     {
@@ -140,7 +136,8 @@ impl<'a> Fields<'a> {
         root: &'a T,
     ) -> ServerResult<()> {
         for selection in &ctx.item.node.items {
-            if ctx.is_skip(&selection.node.directives())? {
+            if let Err(err) = ctx.is_skip(&selection.node.directives()) {
+                ctx.add_input_value_error(err)
                 continue;
             }
 

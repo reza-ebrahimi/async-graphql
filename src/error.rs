@@ -56,9 +56,9 @@ impl ServerError {
         self
     }
 
-    /// Prepend a path to the error.
-    pub fn path(mut self, path: PathSegment) -> Self {
-        self.path.insert(0, path);
+    /// Set a path to the error.
+    pub fn path(mut self, path: Vec<PathSegment>) -> Self {
+        self.path = path;
         self
     }
 }
@@ -72,12 +72,6 @@ impl Display for ServerError {
 impl From<ServerError> for Vec<ServerError> {
     fn from(single: ServerError) -> Self {
         vec![single]
-    }
-}
-
-impl From<Error> for ServerError {
-    fn from(e: Error) -> Self {
-        e.into_server_error()
     }
 }
 
@@ -156,11 +150,6 @@ impl<T: InputType> InputValueError<T> {
             InputValueError::new(self.message)
         }
     }
-
-    /// Convert the error into a server error.
-    pub fn into_server_error(self) -> ServerError {
-        ServerError::new(self.message)
-    }
 }
 
 impl<T: InputType, E: Display> From<E> for InputValueError<T> {
@@ -188,17 +177,6 @@ impl Error {
         Self {
             message: message.into(),
             extensions: None,
-        }
-    }
-
-    /// Convert the error to a server error.
-    #[must_use]
-    pub fn into_server_error(self) -> ServerError {
-        ServerError {
-            message: self.message,
-            locations: Vec::new(),
-            path: Vec::new(),
-            extensions: self.extensions,
         }
     }
 }

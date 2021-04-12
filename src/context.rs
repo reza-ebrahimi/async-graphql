@@ -18,8 +18,8 @@ use crate::parser::types::{
 };
 use crate::schema::SchemaEnv;
 use crate::{
-    Error, InputType, Lookahead, Name, Pos, Positioned, Result, ServerError, ServerResult,
-    UploadValue, Value,
+    Error, InputType, InputValueError, Lookahead, Name, PathSegment, Pos, Positioned, Result,
+    ServerError, ServerResult, UploadValue, Value,
 };
 
 /// Schema/Context data.
@@ -160,6 +160,15 @@ impl<'a> QueryPathNode<'a> {
         }
         f(&self.segment)
     }
+
+    pub(crate) fn to_path_segments(&self) -> Vec<PathSegment> {
+        let mut segments = Vec::new();
+        self.for_each(|segment| match segment {
+            QueryPathSegment::Name(name) => segments.push(PathSegment::Field(name.to_string())),
+            QueryPathSegment::Index(idx) => segments.push(PathSegment::Index(*idx)),
+        });
+        segments
+    }
 }
 
 /// An iterator over the parents of a [`QueryPathNode`](struct.QueryPathNode.html).
@@ -205,6 +214,7 @@ pub struct ContextBase<'a, T> {
 
 #[doc(hidden)]
 pub struct QueryEnvInner {
+    pub errors: Mutex<Vec<ServerError>>,
     pub extensions: Extensions,
     pub variables: Variables,
     pub operation: Positioned<OperationDefinition>,
@@ -516,6 +526,25 @@ impl<'a> ContextBase<'a, &'a Positioned<SelectionSet>> {
             schema_env: self.schema_env,
             query_env: self.query_env,
         }
+    }
+}
+
+impl<'a, T> ContextBase<'a, &'a Positioned<T>> {
+    pub(crate) fn add_input_value_error<Q>(&self, err: InputValueError<Q>) {
+        let mut server_err = ServerError::new(self.message).at(self.item.pos);
+        if let Some(path) = &self.path_node {
+            server_err = server_err.path(path.to_path_segments());
+        }
+        self.query_env.errors.lock().unwrap().push(server_err);
+    }
+
+    pub(crate) fn add_error(&self, err: Error) {
+        let mut server_err = ServerError::new(err.message).at(self.item.pos);
+        server_err.extensions = err.extensions;
+        if let Some(path) = &self.path_node {
+            server_err = server_err.path(path.to_path_segments());
+        }
+        self.query_env.errors.lock().unwrap().push(server_err);
     }
 }
 
